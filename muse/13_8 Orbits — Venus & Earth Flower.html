@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>13:8 Orbits — Venus &amp; Earth Flower</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f3eddc;
+        --bg-deep: #ece3cb;
+        --ink: #2b2416;
+        --ink-soft: #6b5f45;
+        --line: #d8cba6;
+        --panel: rgba(255, 252, 244, 0.82);
+        --panel-line: #d8cba6;
+        --accent: #b4761b;
+        --accent-ink: #8a5a10;
+        --btn-bg: #fffdf6;
+        --btn-ink: #2b2416;
+        --btn-active-bg: #2b2416;
+        --btn-active-ink: #f6efdd;
+        --stage-bg: radial-gradient(120% 120% at 50% 42%, #fbf7ea 0%, #f3eddc 58%, #e9dfc4 100%);
+        --shadow: 0 18px 50px rgba(84, 64, 20, 0.16);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #060913;
+          --bg-deep: #04060d;
+          --ink: #ece5d3;
+          --ink-soft: #9a917c;
+          --line: #232a3f;
+          --panel: rgba(13, 18, 32, 0.78);
+          --panel-line: #2a3350;
+          --accent: #e6b34d;
+          --accent-ink: #f0c96e;
+          --btn-bg: #101728;
+          --btn-ink: #ece5d3;
+          --btn-active-bg: #e6b34d;
+          --btn-active-ink: #181206;
+          --stage-bg: radial-gradient(120% 120% at 50% 42%, #0d1428 0%, #070b18 55%, #03050b 100%);
+          --shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+        }
+      }
+
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Outfit", system-ui, -apple-system, sans-serif;
+        font-weight: 300;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .wrap {
+        max-width: 1060px;
+        margin: 0 auto;
+        padding: clamp(20px, 4vw, 44px) clamp(16px, 4vw, 40px) 56px;
+      }
+
+      header { text-align: center; margin-bottom: clamp(18px, 3vw, 30px); }
+      header h1 {
+        font-family: "Cormorant Garamond", Georgia, serif;
+        font-weight: 600;
+        font-size: clamp(34px, 6vw, 58px);
+        line-height: 1.05;
+        margin: 0 0 10px;
+        letter-spacing: 0.01em;
+      }
+      header h1 .ratio { color: var(--accent); font-style: italic; }
+      header p {
+        margin: 0 auto;
+        max-width: 56ch;
+        color: var(--ink-soft);
+        font-size: clamp(15px, 2.2vw, 17.5px);
+      }
+
+      /* ---------- Stage ---------- */
+      .stage {
+        position: relative;
+        height: min(76svh, 700px);
+        min-height: 380px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--stage-bg);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .stage canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .stage::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        border-radius: inherit;
+        box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.14);
+      }
+      @media (prefers-color-scheme: dark) {
+        .stage::after { box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.6); }
+      }
+
+      .hud {
+        position: absolute;
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 10px 14px;
+        border: 1px solid var(--panel-line);
+        border-radius: 12px;
+        background: var(--panel);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        font-size: 12.5px;
+        letter-spacing: 0.02em;
+        pointer-events: none;
+      }
+      .hud .row { display: flex; justify-content: space-between; gap: 18px; white-space: nowrap; }
+      .hud .k { color: var(--ink-soft); text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.14em; padding-top: 2px; }
+      .hud .v { font-variant-numeric: tabular-nums; font-weight: 500; }
+      .hud-stats { top: 14px; left: 14px; }
+      .hud-cycle { top: 14px; right: 14px; text-align: right; min-width: 168px; }
+      .hud-cycle .bar {
+        margin-top: 7px;
+        height: 4px;
+        border-radius: 99px;
+        background: var(--line);
+        overflow: hidden;
+      }
+      .hud-cycle .bar i {
+        display: block;
+        height: 100%;
+        width: 0%;
+        background: var(--accent);
+        border-radius: inherit;
+        transition: width 0.2s linear;
+      }
+      .hud-cycle .cap { color: var(--ink-soft); font-size: 11px; margin-top: 5px; letter-spacing: 0.04em; }
+      @media (max-width: 560px) {
+        .hud-stats { display: none; }
+        .hud-cycle { min-width: 0; }
+      }
+
+      /* ---------- Controls ---------- */
+      .controls {
+        margin-top: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 14px;
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--panel);
+      }
+      .controls .group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .controls .spacer { flex: 1 1 auto; }
+      button {
+        font: inherit;
+        font-size: 13.5px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        color: var(--btn-ink);
+        background: var(--btn-bg);
+        border: 1px solid var(--panel-line);
+        border-radius: 99px;
+        padding: 8px 16px;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+      }
+      button:hover { border-color: var(--accent); }
+      button:active { transform: scale(0.97); }
+      button:focus-visible, input[type="range"]:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      button.primary {
+        background: var(--btn-active-bg);
+        color: var(--btn-active-ink);
+        border-color: var(--btn-active-bg);
+        min-width: 104px;
+      }
+      button[aria-pressed="true"] {
+        background: var(--btn-active-bg);
+        color: var(--btn-active-ink);
+        border-color: var(--btn-active-bg);
+      }
+      .slider-group { gap: 10px; }
+      .slider-group label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--ink-soft);
+        font-weight: 500;
+      }
+      .slider-group output {
+        font-size: 12.5px;
+        font-variant-numeric: tabular-nums;
+        min-width: 86px;
+        color: var(--ink);
+      }
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 130px;
+        height: 4px;
+        border-radius: 99px;
+        background: var(--line);
+        cursor: pointer;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px; height: 16px;
+        border-radius: 50%;
+        background: var(--accent);
+        border: 2px solid var(--btn-bg);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 14px; height: 14px;
+        border-radius: 50%;
+        background: var(--accent);
+        border: 2px solid var(--btn-bg);
+      }
+
+      /* ---------- Explainer ---------- */
+      .explainer {
+        margin-top: clamp(30px, 5vw, 52px);
+        display: grid;
+        grid-template-columns: 1.25fr 1fr;
+        gap: clamp(24px, 4vw, 52px);
+      }
+      @media (max-width: 720px) { .explainer { grid-template-columns: 1fr; } }
+      .explainer h2 {
+        font-family: "Cormorant Garamond", Georgia, serif;
+        font-weight: 600;
+        font-size: clamp(24px, 3.4vw, 32px);
+        margin: 0 0 12px;
+        line-height: 1.15;
+      }
+      .explainer p { margin: 0 0 12px; color: var(--ink); font-size: 15.5px; }
+      .explainer p:last-child { margin-bottom: 0; }
+      .explainer em { font-family: "Cormorant Garamond", Georgia, serif; font-size: 1.12em; }
+      .facts { list-style: none; margin: 4px 0 0; padding: 0; }
+      .facts li {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 16px;
+        padding: 10px 2px;
+        border-bottom: 1px solid var(--line);
+        font-size: 14.5px;
+      }
+      .facts li:first-child { border-top: 1px solid var(--line); }
+      .facts .fk { color: var(--ink-soft); }
+      .facts .fv { font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+      footer {
+        margin-top: 40px;
+        text-align: center;
+        color: var(--ink-soft);
+        font-size: 13px;
+      }
+      footer .dot { color: var(--accent); padding: 0 6px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>The <span class="ratio">13 : 8</span> Flower of Venus</h1>
+        <p>
+          Venus circles the Sun thirteen times for every eight Earth years. Draw a line between
+          the two planets as they go, and the lines weave themselves into a five-petaled flower.
+        </p>
+      </header>
+
+      <section class="stage" id="stage">
+        <canvas id="scene" role="img"
+          aria-label="Animation of Earth and Venus orbiting the Sun. A line joins the two planets and gradually traces a five-petaled flower pattern."></canvas>
+
+        <div class="hud hud-stats" aria-hidden="true">
+          <div class="row"><span class="k">Earth years</span><span class="v" id="statEarth">0.00</span></div>
+          <div class="row"><span class="k">Venus orbits</span><span class="v" id="statVenus">0.00</span></div>
+          <div class="row"><span class="k">Petals woven</span><span class="v" id="statPetals">0 of 5</span></div>
+        </div>
+
+        <div class="hud hud-cycle" aria-hidden="true">
+          <div class="row"><span class="k">Dance cycle</span><span class="v" id="statCycle">0%</span></div>
+          <div class="bar"><i id="cycleBar"></i></div>
+          <div class="cap">one full flower = 8 Earth years</div>
+        </div>
+      </section>
+
+      <div class="controls" role="group" aria-label="Animation controls">
+        <div class="group">
+          <button class="primary" id="playBtn" type="button">Pause</button>
+          <button id="clearBtn" type="button">Clear trace</button>
+        </div>
+        <div class="group slider-group">
+          <label for="speed">Speed</label>
+          <input type="range" id="speed" min="0" max="100" value="57" />
+          <output id="speedOut" for="speed">1 yr / 6.7 s</output>
+        </div>
+        <div class="group slider-group">
+          <label for="fade">Fade</label>
+          <input type="range" id="fade" min="0" max="100" value="0" />
+          <output id="fadeOut" for="fade">permanent</output>
+        </div>
+        <div class="spacer"></div>
+        <div class="group">
+          <button id="orbitsBtn" type="button" aria-pressed="true">Orbit rings</button>
+          <button id="labelsBtn" type="button" aria-pressed="true">Labels</button>
+          <button id="ratioBtn" type="button" aria-pressed="false">True periods</button>
+        </div>
+      </div>
+
+      <section class="explainer">
+        <div>
+          <h2>Why five petals?</h2>
+          <p>
+            Venus's year is about 225 Earth days, Earth's is 365. Their ratio sits remarkably
+            close to <em>13 : 8</em> — in the time Earth makes eight trips around the Sun, Venus
+            makes almost exactly thirteen. Every conjunction, when Venus slips between Earth and
+            the Sun, happens a little further along the zodiac than the last.
+          </p>
+          <p>
+            The two planets meet <em>13 − 8 = 5</em> times in each eight-year cycle, and those
+            five meeting points land evenly spaced around the Sun — the vertices of a slow
+            pentagram. The chord drawn between the planets sweeps through every in-between
+            position too, filling the pentagram out into the rounded, five-petaled rose you see
+            above. Eight years later the pattern closes and begins again.
+          </p>
+          <p>
+            It is a near-resonance, not an exact one — the true ratio is 1.6257, a hair off 13/8 =
+            1.625. Switch on <em>True periods</em> above and let it run: the flower no longer
+            quite closes, and the whole rose slowly rotates, precessing through the sky over
+            centuries.
+          </p>
+        </div>
+        <div>
+          <h2>The numbers</h2>
+          <ul class="facts">
+            <li><span class="fk">Venus orbital period</span><span class="fv">224.7 days</span></li>
+            <li><span class="fk">Earth orbital period</span><span class="fv">365.25 days</span></li>
+            <li><span class="fk">Period ratio</span><span class="fv">1.6257 ≈ 13 / 8</span></li>
+            <li><span class="fk">Venus orbits per 8 Earth yrs</span><span class="fv">13.006</span></li>
+            <li><span class="fk">Meetings (synodic period)</span><span class="fv">every 583.9 days</span></li>
+            <li><span class="fk">Meetings per flower</span><span class="fv">5</span></li>
+            <li><span class="fk">Venus orbit radius</span><span class="fv">0.723 × Earth's</span></li>
+            <li><span class="fk">Full cycle</span><span class="fv">8 years</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <footer>
+        A geometric portrait of a near-resonance <span class="dot">·</span> press
+        <strong>Space</strong> to pause <span class="dot">·</span> the flower completes every
+        8 Earth years
+      </footer>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        var stage = document.getElementById("stage");
+        var canvas = document.getElementById("scene");
+        var ctx = canvas.getContext("2d");
+
+        // Persistent offscreen canvas holding the woven trace lines.
+        var trace = document.createElement("canvas");
+        var tctx = trace.getContext("2d");
+
+        var darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+        var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        var PALETTES = {
+          dark: {
+            star: "255,244,214",
+            orbit: "rgba(160,175,215,0.30)",
+            traceSat: "88%", traceLight: "68%", traceAlpha: 0.30,
+            chord: "rgba(255,226,160,0.85)",
+            sunCore: "#fff3c4", sunMid: "#f7b733", sunEdge: "rgba(247,140,30,0)",
+            sunGlow: "rgba(247,160,50,0.20)",
+            venus: "#f6dfa8", venusGlow: "rgba(246,214,150,0.55)",
+            earth: "#79b8ff", earthGlow: "rgba(110,170,255,0.55)",
+            label: "rgba(236,229,211,0.85)"
+          },
+          light: {
+            star: "120,95,40",
+            orbit: "rgba(107,86,40,0.35)",
+            traceSat: "62%", traceLight: "36%", traceAlpha: 0.28,
+            chord: "rgba(150,95,15,0.75)",
+            sunCore: "#ffdf7e", sunMid: "#eda41c", sunEdge: "rgba(237,164,28,0)",
+            sunGlow: "rgba(237,164,28,0.22)",
+            venus: "#b98a1e", venusGlow: "rgba(185,138,30,0.4)",
+            earth: "#2f6fd0", earthGlow: "rgba(47,111,208,0.4)",
+            label: "rgba(64,50,20,0.85)"
+          }
+        };
+        function palette() { return darkQuery.matches ? PALETTES.dark : PALETTES.light; }
+
+        // ---- Geometry / state ----
+        var W = 0, H = 0, DPR = 1, CX = 0, CY = 0, R = 0;
+        var VENUS_R_RATIO = 0.723;
+        var stars = [];
+
+        var TRUE_RATIO = 365.256 / 224.701; // Venus orbits per Earth year, real periods
+        var EXACT_RATIO = 13 / 8;
+
+        var state = {
+          playing: !reducedMotion,
+          speed: 0.15,          // Earth years per second
+          fade: 0,               // trace fade rate per second (0 = permanent)
+          showOrbits: true,
+          showLabels: true,
+          truePeriods: false,
+          t: 0,                  // Earth years elapsed
+          venusOrbits: 0,
+          synodic: 0,            // conjunctions elapsed (petals)
+          thE: -Math.PI / 2,     // start in conjunction at top
+          thV: -Math.PI / 2
+        };
+        function ratio() { return state.truePeriods ? TRUE_RATIO : EXACT_RATIO; }
+
+        function planetPos(theta, r) {
+          // y flipped so motion runs counter-clockwise, as seen from north.
+          return { x: CX + r * Math.cos(theta), y: CY - r * Math.sin(theta) };
+        }
+
+        // ---- Sizing ----
+        function resize() {
+          var rect = stage.getBoundingClientRect();
+          DPR = Math.min(window.devicePixelRatio || 1, 2);
+          W = Math.max(280, rect.width);
+          H = Math.max(280, rect.height);
+
+          // Preserve the existing trace across the resize.
+          var old = document.createElement("canvas");
+          old.width = trace.width; old.height = trace.height;
+          if (trace.width > 0) old.getContext("2d").drawImage(trace, 0, 0);
+
+          canvas.width = Math.round(W * DPR);
+          canvas.height = Math.round(H * DPR);
+          trace.width = Math.round(W * DPR);
+          trace.height = Math.round(H * DPR);
+          if (old.width > 0) tctx.drawImage(old, 0, 0, trace.width, trace.height);
+
+          CX = W / 2; CY = H / 2;
+          R = Math.min(W, H) * 0.415;
+
+          stars = [];
+          var n = Math.round((W * H) / 9000);
+          for (var i = 0; i < n; i++) {
+            stars.push({
+              x: Math.random() * W, y: Math.random() * H,
+              r: Math.random() * 1.3 + 0.3,
+              a: Math.random() * 0.55 + 0.12,
+              tw: Math.random() * Math.PI * 2
+            });
+          }
+          draw(0);
+        }
+
+        // ---- Trace weaving ----
+        function weave(dtYears) {
+          var r = ratio();
+          var dE = Math.PI * 2 * dtYears;
+          var dV = dE * r;
+          // Substep so fast speeds still draw smooth, unbroken chords.
+          var steps = Math.max(1, Math.ceil(Math.abs(dV) / 0.012));
+          var sE = dE / steps, sV = dV / steps;
+          var p = palette();
+
+          tctx.save();
+          tctx.scale(DPR, DPR);
+          tctx.lineWidth = 1;
+          tctx.lineCap = "round";
+          for (var i = 0; i < steps; i++) {
+            var e0 = planetPos(state.thE, R);
+            var v0 = planetPos(state.thV, R * VENUS_R_RATIO);
+            state.thE += sE;
+            state.thV += sV;
+            var e1 = planetPos(state.thE, R);
+            var v1 = planetPos(state.thV, R * VENUS_R_RATIO);
+            // Colour drifts gold -> rose across each petal (one synodic cycle).
+            var phase = state.synodic % 1;
+            var hue = 44 + 292 * phase;
+            tctx.strokeStyle = "hsla(" + hue + "," + p.traceSat + "," + p.traceLight + "," + p.traceAlpha + ")";
+            tctx.beginPath();
+            tctx.moveTo(v0.x, v0.y);
+            tctx.lineTo(e0.x, e0.y);
+            tctx.lineTo(e1.x, e1.y); // tiny continuation keeps fast strokes gap-free
+            tctx.moveTo(v0.x, v0.y);
+            tctx.lineTo(v1.x, v1.y);
+            tctx.stroke();
+          }
+          tctx.restore();
+
+          state.t += dtYears;
+          state.venusOrbits += dtYears * r;
+          state.synodic += dtYears * (r - 1);
+        }
+
+        function fadeTrace(dt) {
+          if (state.fade <= 0) return;
+          tctx.save();
+          tctx.globalCompositeOperation = "destination-out";
+          tctx.fillStyle = "rgba(0,0,0," + Math.min(1, state.fade * dt) + ")";
+          tctx.fillRect(0, 0, trace.width, trace.height);
+          tctx.restore();
+        }
+
+        // ---- Scene drawing ----
+        function draw(now) {
+          var p = palette();
+          ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+          ctx.clearRect(0, 0, W, H);
+
+          // Stars
+          ctx.fillStyle = "rgba(" + p.star + ",1)";
+          for (var i = 0; i < stars.length; i++) {
+            var s = stars[i];
+            var tw = 0.75 + 0.25 * Math.sin(now / 1400 + s.tw);
+            ctx.globalAlpha = s.a * tw;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+
+          // Orbit rings
+          if (state.showOrbits) {
+            ctx.strokeStyle = p.orbit;
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(CX, CY, R, 0, Math.PI * 2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(CX, CY, R * VENUS_R_RATIO, 0, Math.PI * 2); ctx.stroke();
+          }
+
+          // The woven flower
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.drawImage(trace, 0, 0);
+          ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+          var e = planetPos(state.thE, R);
+          var v = planetPos(state.thV, R * VENUS_R_RATIO);
+
+          // Live chord
+          ctx.strokeStyle = p.chord;
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.moveTo(v.x, v.y);
+          ctx.lineTo(e.x, e.y);
+          ctx.stroke();
+
+          // Sun
+          var sunR = Math.max(13, R * 0.075);
+          var glow = ctx.createRadialGradient(CX, CY, 0, CX, CY, sunR * 4.2);
+          glow.addColorStop(0, p.sunGlow);
+          glow.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = glow;
+          ctx.beginPath(); ctx.arc(CX, CY, sunR * 4.2, 0, Math.PI * 2); ctx.fill();
+          var core = ctx.createRadialGradient(CX - sunR * 0.3, CY - sunR * 0.3, 0, CX, CY, sunR);
+          core.addColorStop(0, p.sunCore);
+          core.addColorStop(0.75, p.sunMid);
+          core.addColorStop(1, p.sunEdge);
+          ctx.fillStyle = core;
+          ctx.beginPath(); ctx.arc(CX, CY, sunR, 0, Math.PI * 2); ctx.fill();
+
+          // Planets
+          drawPlanet(v, Math.max(4.5, R * 0.026), p.venus, p.venusGlow);
+          drawPlanet(e, Math.max(5.5, R * 0.031), p.earth, p.earthGlow);
+
+          // Labels
+          if (state.showLabels) {
+            ctx.font = "500 12px Outfit, system-ui, sans-serif";
+            ctx.fillStyle = p.label;
+            ctx.textAlign = "left";
+            ctx.fillText("Venus", v.x + 11, v.y - 8);
+            ctx.fillText("Earth", e.x + 12, e.y + 4);
+            ctx.textAlign = "center";
+            ctx.fillText("Sun", CX, CY + sunR + 16);
+          }
+        }
+
+        function drawPlanet(pos, r, color, glowColor) {
+          ctx.save();
+          ctx.shadowColor = glowColor;
+          ctx.shadowBlur = 16;
+          ctx.fillStyle = color;
+          ctx.beginPath(); ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+          ctx.fillStyle = "rgba(255,255,255,0.35)";
+          ctx.beginPath(); ctx.arc(pos.x - r * 0.3, pos.y - r * 0.3, r * 0.32, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // ---- HUD ----
+        var statEarth = document.getElementById("statEarth");
+        var statVenus = document.getElementById("statVenus");
+        var statPetals = document.getElementById("statPetals");
+        var statCycle = document.getElementById("statCycle");
+        var cycleBar = document.getElementById("cycleBar");
+        var hudTimer = 0;
+        function updateHud(now) {
+          if (now - hudTimer < 120) return;
+          hudTimer = now;
+          statEarth.textContent = state.t.toFixed(2);
+          statVenus.textContent = state.venusOrbits.toFixed(2);
+          statPetals.textContent = (Math.floor(state.synodic) % 5) + " of 5";
+          var cyc = ((state.t % 8) + 8) % 8 / 8;
+          statCycle.textContent = Math.round(cyc * 100) + "%";
+          cycleBar.style.width = (cyc * 100).toFixed(1) + "%";
+        }
+
+        // ---- Main loop ----
+        var last = null;
+        function frame(now) {
+          if (last === null) last = now;
+          var dt = Math.min(0.05, (now - last) / 1000);
+          last = now;
+          if (state.playing && dt > 0) {
+            fadeTrace(dt);
+            weave(state.speed * dt);
+          }
+          draw(now);
+          updateHud(now);
+          requestAnimationFrame(frame);
+        }
+
+        // ---- Controls ----
+        var playBtn = document.getElementById("playBtn");
+        function syncPlay() { playBtn.textContent = state.playing ? "Pause" : "Play"; }
+        playBtn.addEventListener("click", function () {
+          state.playing = !state.playing;
+          syncPlay();
+        });
+        document.addEventListener("keydown", function (ev) {
+          if (ev.code === "Space" && !/INPUT|BUTTON/.test(document.activeElement.tagName)) {
+            ev.preventDefault();
+            state.playing = !state.playing;
+            syncPlay();
+          }
+        });
+
+        document.getElementById("clearBtn").addEventListener("click", function () {
+          tctx.clearRect(0, 0, trace.width, trace.height);
+          state.t = 0; state.venusOrbits = 0; state.synodic = 0;
+          hudTimer = 0;
+        });
+
+        var speedInput = document.getElementById("speed");
+        var speedOut = document.getElementById("speedOut");
+        function syncSpeed() {
+          var v = speedInput.value / 100;
+          state.speed = 0.01 * Math.pow(140, v); // 0.01 .. 1.4 Earth yr / s
+          var per = 1 / state.speed;
+          speedOut.textContent = per >= 10 ? "1 yr / " + per.toFixed(0) + " s"
+            : "1 yr / " + per.toFixed(1) + " s";
+        }
+        speedInput.addEventListener("input", syncSpeed);
+
+        var fadeInput = document.getElementById("fade");
+        var fadeOut = document.getElementById("fadeOut");
+        function syncFade() {
+          var v = fadeInput.value / 100;
+          state.fade = v * 0.22;
+          fadeOut.textContent = v === 0 ? "permanent" : v < 0.4 ? "slow fade" : v < 0.75 ? "medium fade" : "fast fade";
+        }
+        fadeInput.addEventListener("input", syncFade);
+
+        var orbitsBtn = document.getElementById("orbitsBtn");
+        orbitsBtn.addEventListener("click", function () {
+          state.showOrbits = !state.showOrbits;
+          orbitsBtn.setAttribute("aria-pressed", String(state.showOrbits));
+        });
+        var labelsBtn = document.getElementById("labelsBtn");
+        labelsBtn.addEventListener("click", function () {
+          state.showLabels = !state.showLabels;
+          labelsBtn.setAttribute("aria-pressed", String(state.showLabels));
+        });
+        var ratioBtn = document.getElementById("ratioBtn");
+        ratioBtn.addEventListener("click", function () {
+          state.truePeriods = !state.truePeriods;
+          ratioBtn.setAttribute("aria-pressed", String(state.truePeriods));
+          ratioBtn.textContent = state.truePeriods ? "Exact 13 : 8" : "True periods";
+        });
+
+        if (darkQuery.addEventListener) {
+          darkQuery.addEventListener("change", function () { draw(performance.now()); });
+        }
+
+        var resizeTimer = null;
+        window.addEventListener("resize", function () {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(resize, 120);
+        });
+
+        syncPlay();
+        syncSpeed();
+        syncFade();
+        resize();
+        requestAnimationFrame(frame);
+      })();
+    </script>
+  </body>
+</html>
