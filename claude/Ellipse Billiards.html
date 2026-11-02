@@ -1,0 +1,389 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Ellipse Billiards</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one full-height stage; a neon ellipse centred under a ball counter, canvas does all the drawing. Single dark look by design. */
+:root {
+  --bg: #060a14;
+  --wall: #5fe3ff;
+  --wall-core: #c4f7ff;
+  --gold: #ffc93c;
+  --fg: #eef1fb;
+  --muted: #7d88a6;
+  --font-ui: "DejaVu Sans", Verdana, "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  box-sizing: border-box;
+  margin: 0;
+  padding-block: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  overflow: hidden;
+}
+.stage { position: relative; height: 100%; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.count {
+  position: absolute; top: 14px; left: 0; right: 0;
+  text-align: center; font-size: clamp(26px, 6.4vw, 40px); font-weight: 700;
+  letter-spacing: 0.01em; font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.count b { color: var(--gold); font-weight: 700; }
+.hint {
+  position: absolute; bottom: 6px; left: 0; right: 0; text-align: center;
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+  pointer-events: none;
+}
+.snd {
+  position: absolute; top: 14px; right: 0; min-height: 36px; padding: 6px 14px;
+  font: 600 12px/1 var(--font-ui); letter-spacing: 0.06em; color: var(--fg);
+  background: rgba(95,227,255,0.08); border: 1px solid var(--wall); border-radius: 18px;
+  cursor: pointer;
+}
+.snd[aria-pressed="true"] { background: rgba(95,227,255,0.22); border-color: var(--gold); }
+.snd:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.stage:focus-visible { outline: 2px solid var(--wall); outline-offset: -2px; }
+</style>
+
+<div class="stage" id="stage" tabindex="0" role="img" aria-label="Balls fired from one focus of an ellipse bounce off the wall and all meet at the other focus, then the number of balls grows along the Fibonacci sequence.">
+  <canvas id="c"></canvas>
+  <div class="count" id="count">balls: <b>1</b></div>
+  <div class="hint" id="hint">tap to pause</div>
+  <button class="snd" id="snd" type="button" aria-pressed="false">Sound off</button>
+</div>
+
+<script>
+(function () {
+  var stage = document.getElementById('stage');
+  var cv = document.getElementById('c');
+  var ctx = cv.getContext('2d');
+  var countEl = document.getElementById('count');
+  var hintEl = document.getElementById('hint');
+  var css = getComputedStyle(document.documentElement);
+  var BG = css.getPropertyValue('--bg').trim() || '#060a14';
+  var GOLD = '#c9992f';
+
+  var FIB = [1, 3, 5, 8, 13, 21, 34, 55, 89];
+  var PERIOD = 1.4;          // seconds for one focus-to-focus flight
+  var STEP = 1 / 240;        // fixed physics step
+  var TRAIL = 7;             // samples kept per ball tail
+
+  var W, H, dpr, cx, cy, A, B, A2, B2, Cc, V, ballR, wall;
+  var gen = 0, side = 1, tg = 0, tick = 0;
+  var balls = [], pulses = [];
+  var paused = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Synthesized sound: wall pings, arrival chime, launch blip. Starts only after the Sound button is pressed.
+  var sfx = (function () {
+    var ac = null, master = null, on = false, budget = 0, lastT = 0;
+    var SCALE = [0, 2, 4, 7, 9];
+    function note(i) {
+      var oct = Math.floor(i / 5), d = SCALE[((i % 5) + 5) % 5];
+      return 220 * Math.pow(2, (d + 12 * oct) / 12);
+    }
+    function ensure() {
+      if (!ac) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return false;
+        try { ac = new AC(); } catch (e) { return false; }
+        var comp = ac.createDynamicsCompressor();
+        master = ac.createGain(); master.gain.value = 0.8;
+        master.connect(comp); comp.connect(ac.destination);
+      }
+      if (ac.state === 'suspended') ac.resume();
+      return true;
+    }
+    function tone(freq, t, dur, vol, type) {
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = type || 'sine'; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(master);
+      o.start(t); o.stop(t + dur + 0.03);
+    }
+    function sweep(f0, f1, t, dur, vol) {
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f0, t);
+      o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(master);
+      o.start(t); o.stop(t + dur + 0.03);
+    }
+    return {
+      isOn: function () { return on; },
+      set: function (v) {
+        if (v && !ensure()) return false;
+        on = v;
+        if (ac && master) master.gain.setTargetAtTime(v ? 0.8 : 0, ac.currentTime, 0.03);
+        return on;
+      },
+      bounce: function (b) {
+        if (!on) return;
+        var t = ac.currentTime;
+        if (t - lastT > 0.05) { lastT = t; budget = 10; }
+        if (budget-- <= 0) return;
+        var idx = Math.floor((b.hue % 360) / 360 * 10) + 3;
+        var vol = 0.1 / Math.sqrt(Math.max(1, balls.length / 3));
+        tone(note(idx), t + Math.random() * 0.012, 0.22, vol, 'sine');
+      },
+      arrive: function (g) {
+        if (!on) return;
+        var t = ac.currentTime, i0 = 3 + g;
+        sweep(150, 48, t, 0.2, 0.22);
+        tone(note(i0), t, 0.9, 0.09, 'triangle');
+        tone(note(i0 + 2), t, 0.9, 0.07, 'triangle');
+        tone(note(i0 + 4), t, 0.9, 0.06, 'triangle');
+        tone(note(i0 + 7), t + 0.03, 1.2, 0.035, 'sine');
+      },
+      launch: function (g) {
+        if (!on) return;
+        var t = ac.currentTime;
+        sweep(260 + g * 30, 820 + g * 60, t, 0.14, 0.05);
+      }
+    };
+  })();
+
+  function layout() {
+    var r = stage.getBoundingClientRect();
+    W = Math.max(200, r.width); H = Math.max(300, r.height);
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    var topPad = 66, botPad = 30, sidePad = 12;
+    var availH = H - topPad - botPad, availW = W - sidePad * 2;
+    var ratio = 1.47;
+    B = Math.min(availH / 2, availW / 2 * ratio);
+    A = B / ratio;
+    A2 = A * A; B2 = B * B;
+    Cc = Math.sqrt(B2 - A2);
+    cx = W / 2; cy = topPad + availH / 2;
+    V = 2 * B / PERIOD;
+    ballR = Math.max(4.5, Math.min(8, A * 0.024));
+
+    wall = document.createElement('canvas');
+    wall.width = cv.width; wall.height = cv.height;
+    var w = wall.getContext('2d');
+    w.scale(dpr, dpr);
+    var lw = Math.max(4, A * 0.017);
+    w.lineWidth = lw;
+    w.strokeStyle = '#4fdcff';
+    w.shadowColor = 'rgba(40,215,255,0.95)';
+    w.shadowBlur = 24 * dpr;
+    w.beginPath(); w.ellipse(cx, cy, A, B, 0, 0, Math.PI * 2);
+    w.stroke(); w.stroke();
+    w.shadowBlur = 0;
+    w.strokeStyle = '#a9f2ff';
+    w.lineWidth = lw * 0.55;
+    w.stroke();
+  }
+
+  function makeSprite(hue) {
+    var s = Math.ceil(ballR * 6);
+    var c = document.createElement('canvas');
+    c.width = Math.ceil(s * dpr); c.height = Math.ceil(s * dpr);
+    var g = c.getContext('2d');
+    g.scale(dpr, dpr);
+    var m = s / 2;
+    var gr = g.createRadialGradient(m, m, 0, m, m, m);
+    gr.addColorStop(0, 'hsla(' + hue + ',95%,62%,0.55)');
+    gr.addColorStop(1, 'hsla(' + hue + ',95%,62%,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, s, s);
+    g.beginPath(); g.arc(m, m, ballR, 0, Math.PI * 2);
+    g.fillStyle = 'hsl(' + hue + ',88%,58%)'; g.fill();
+    g.lineWidth = Math.max(1.4, ballR * 0.26);
+    g.strokeStyle = 'rgba(255,255,255,0.92)'; g.stroke();
+    g.beginPath(); g.arc(m - ballR * 0.28, m - ballR * 0.3, ballR * 0.28, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(255,255,255,0.55)'; g.fill();
+    return { img: c, size: s };
+  }
+
+  function spawn() {
+    var n = FIB[gen];
+    var fy = side * Cc;
+    var off = gen * 0.41 + 0.2;
+    balls = [];
+    for (var i = 0; i < n; i++) {
+      var ang = n === 1 ? (side > 0 ? 0.33 * Math.PI : -0.67 * Math.PI) : off + i * 2 * Math.PI / n;
+      var hue = n === 1 ? 186 : (190 + (i / n) * 330) % 360;
+      balls.push({
+        x: 0, y: fy,
+        vx: Math.cos(ang) * V, vy: Math.sin(ang) * V,
+        hue: hue, path: [[0, fy]], hist: [], sprite: makeSprite(Math.round(hue))
+      });
+    }
+    pulses.push({ x: 0, y: fy, t: 0 });
+    countEl.innerHTML = 'balls: <b>' + n + '</b>';
+  }
+
+  function reset() {
+    gen = 0; side = 1; tg = 0; tick = 0; pulses = [];
+    spawn();
+    for (var k = 0; k < 80; k++) sim(STEP);
+  }
+
+  function adv(b, dt) {
+    var rem = dt;
+    for (var k = 0; k < 4 && rem > 1e-9; k++) {
+      var nx = b.x + b.vx * rem, ny = b.y + b.vy * rem;
+      if (nx * nx / A2 + ny * ny / B2 <= 1) { b.x = nx; b.y = ny; return; }
+      var lo = 0, hi = 1;
+      for (var i = 0; i < 22; i++) {
+        var m = (lo + hi) / 2;
+        var px = b.x + b.vx * rem * m, py = b.y + b.vy * rem * m;
+        if (px * px / A2 + py * py / B2 <= 1) lo = m; else hi = m;
+      }
+      b.x += b.vx * rem * lo; b.y += b.vy * rem * lo;
+      var gx = b.x / A2, gy = b.y / B2, gl = Math.hypot(gx, gy);
+      gx /= gl; gy /= gl;
+      var d = b.vx * gx + b.vy * gy;
+      b.vx -= 2 * d * gx; b.vy -= 2 * d * gy;
+      b.path.push([b.x, b.y]);
+      sfx.bounce(b);
+      b.x -= gx * 0.01; b.y -= gy * 0.01;
+      rem *= (1 - lo);
+    }
+  }
+
+  function sim(h) {
+    tg += h; tick++;
+    for (var i = 0; i < balls.length; i++) adv(balls[i], h);
+    if (tick % 4 === 0) {
+      for (var j = 0; j < balls.length; j++) {
+        var b = balls[j];
+        b.hist.push(b.x, b.y);
+        if (b.hist.length > TRAIL * 2) b.hist.splice(0, 2);
+      }
+    }
+    if (tg >= PERIOD) {
+      tg -= PERIOD;
+      side = -side;
+      sfx.arrive(gen);
+      gen = (gen + 1) % FIB.length;
+      spawn();
+      sfx.launch(gen);
+    }
+  }
+
+  function glow(x, y, r, a) {
+    if (a < 0.01) return;
+    var g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(255,255,255,' + a + ')');
+    g.addColorStop(0.35, 'rgba(255,236,190,' + a * 0.45 + ')');
+    g.addColorStop(1, 'rgba(255,220,150,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function draw(dt) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(wall, 0, 0, W, H);
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    var ringR = Math.max(13, ballR * 2.4);
+    ctx.lineWidth = 2; ctx.strokeStyle = GOLD;
+    for (var s = -1; s <= 1; s += 2) {
+      ctx.beginPath(); ctx.arc(0, s * Cc, ringR, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    var f = tg / PERIOD;
+    var gl = Math.exp(-Math.pow(f / 0.09, 2));
+    var gt = Math.exp(-Math.pow((1 - f) / 0.07, 2));
+    ctx.globalCompositeOperation = 'lighter';
+    glow(0, side * Cc, ringR * 3.2, gl * 0.8);
+    glow(0, -side * Cc, ringR * 3.2, gt * 0.85);
+
+    for (var p = pulses.length - 1; p >= 0; p--) {
+      var pu = pulses[p];
+      pu.t += dt / 0.9;
+      if (pu.t >= 1) { pulses.splice(p, 1); continue; }
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(255,215,130,' + (0.38 * (1 - pu.t)) + ')';
+      ctx.beginPath(); ctx.arc(pu.x, pu.y, ringR + pu.t * A * 0.55, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    var i, j, b;
+    for (i = 0; i < balls.length; i++) {
+      b = balls[i];
+      ctx.lineWidth = 1.3;
+      ctx.strokeStyle = 'hsla(' + b.hue + ',95%,64%,0.78)';
+      ctx.beginPath();
+      ctx.moveTo(b.path[0][0], b.path[0][1]);
+      for (j = 1; j < b.path.length; j++) ctx.lineTo(b.path[j][0], b.path[j][1]);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    for (i = 0; i < balls.length; i++) {
+      b = balls[i];
+      var h = b.hist, n = h.length / 2;
+      var px = b.x, py = b.y;
+      for (j = n - 1; j >= 0; j--) {
+        var k = j / n;
+        ctx.lineWidth = ballR * 1.5 * k + 0.6;
+        ctx.strokeStyle = 'hsla(' + b.hue + ',95%,60%,' + (0.5 * k) + ')';
+        ctx.beginPath(); ctx.moveTo(px, py);
+        px = h[j * 2]; py = h[j * 2 + 1];
+        ctx.lineTo(px, py); ctx.stroke();
+      }
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    for (i = 0; i < balls.length; i++) {
+      b = balls[i];
+      var sp = b.sprite;
+      ctx.drawImage(sp.img, b.x - sp.size / 2, b.y - sp.size / 2, sp.size, sp.size);
+    }
+    ctx.restore();
+  }
+
+  var last = performance.now(), acc = 0;
+  function frame(now) {
+    var dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (!paused) {
+      acc += dt;
+      while (acc >= STEP) { sim(STEP); acc -= STEP; }
+    }
+    draw(paused ? 0 : dt);
+    requestAnimationFrame(frame);
+  }
+
+  function setHint() { hintEl.textContent = paused ? 'paused · tap to play' : 'tap to pause'; }
+  function toggle() { paused = !paused; setHint(); }
+  stage.addEventListener('click', toggle);
+  stage.addEventListener('keydown', function (e) {
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); }
+  });
+
+  var sndBtn = document.getElementById('snd');
+  sndBtn.addEventListener('keydown', function (e) { e.stopPropagation(); });
+  sndBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var on = sfx.set(!sfx.isOn());
+    sndBtn.textContent = on ? 'Sound on' : 'Sound off';
+    sndBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+
+  var rt = null;
+  function onResize() { layout(); reset(); }
+  if (window.ResizeObserver) {
+    new ResizeObserver(function () { clearTimeout(rt); rt = setTimeout(onResize, 120); }).observe(stage);
+  } else {
+    window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(onResize, 120); });
+  }
+
+  layout(); reset(); setHint();
+  requestAnimationFrame(function (t) { last = t; frame(t); });
+})();
+</script>
+
+</body></html>
